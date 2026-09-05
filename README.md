@@ -1,24 +1,14 @@
 # ms-barriodigital-notify
 
-Microservicio encargado del procesamiento asíncrono de notificaciones de **BarrioDigital**.
-
-## Descripción
-
-Este servicio permite desacoplar el envío de notificaciones del flujo transaccional de los trámites.
-
-El usuario no necesita esperar a que una notificación sea enviada para que la operación principal finalice.
+Microservicio encargado del procesamiento asíncrono de notificaciones y avisos de **BarrioDigital**.
 
 ## Responsabilidades
 
-- Consumir tareas desde RabbitMQ.
-- Enviar correos electrónicos.
-- Procesar notificaciones push.
-- Notificar admisiones.
-- Notificar visitas.
-- Notificar resoluciones.
-- Notificar rechazos.
-- Gestionar errores de procesamiento.
-- Evitar procesamiento duplicado.
+- Consumir mensajes desde RabbitMQ.
+- Procesar notificaciones a vecinos.
+- Procesar avisos relacionados con cuadrillas.
+- Registrar en logs el resultado del procesamiento.
+- Manejar errores básicos de mensajería.
 
 ## Stack tecnológico
 
@@ -27,142 +17,87 @@ El usuario no necesita esperar a que una notificación sea enviada para que la o
 - Spring AMQP
 - Maven
 - RabbitMQ
+- Eureka Client
 - Spring Boot Actuator
 - Docker
 
-## Puerto local
+## Puerto
 
 ```text
 8084
 ```
 
-El puerto se utilizará principalmente para endpoints técnicos como health checks.
-
 ## Persistencia
-
-Inicialmente:
 
 ```text
 Sin base de datos
 ```
 
-Si posteriormente se requiere registrar historial de entrega, deberá evaluarse antes de incorporar persistencia propia.
-
 ## RabbitMQ
 
-Cola principal:
+Colas consumidas:
 
 ```text
-q.cmd.email
+q.cmd.notification
+q.cmd.crew
 ```
 
-DLQ:
+### Notificaciones
 
 ```text
-q.cmd.email.dlq
+Requests
+   ↓
+q.cmd.notification
+   ↓
+Notify
 ```
 
-Routing keys consideradas:
-
-```text
-email.send
-email.*
-```
-
-Exchange:
-
-```text
-cmd.direct
-cmd.topic
-```
-
-Dead Letter Exchange:
-
-```text
-cmd.dead.dlx
-```
-
-## Ejemplo de mensaje
+Ejemplo:
 
 ```json
 {
-  "eventId": "uuid",
-  "type": "SEND_EMAIL",
-  "timestamp": "2026-09-05T13:30:00Z",
-  "traceId": "trace-id",
-  "correlationId": "REQ-2026-000001",
-  "version": 1,
-  "payload": {
-    "recipient": "usuario@example.com",
-    "template": "REQUEST_ADMITTED"
-  }
+  "requestId": "uuid",
+  "type": "REQUEST_ADMITTED",
+  "recipient": "usuario@correo.cl",
+  "message": "Su trámite fue admitido.",
+  "timestamp": "2026-09-05T14:00:00Z"
 }
 ```
 
-## Buenas prácticas
+### Avisos a cuadrillas
 
-- ACK explícito.
-- NACK en caso de error.
-- Dead Letter Queue.
-- Reintentos controlados.
-- Procesamiento idempotente.
-- `eventId`.
-- `traceId`.
-- `correlationId`.
-- Logs estructurados.
+```text
+Requests
+   ↓
+q.cmd.crew
+   ↓
+Notify
+```
+
+Ejemplo:
+
+```json
+{
+  "requestId": "uuid",
+  "crewId": "uuid",
+  "message": "Nueva visita asignada.",
+  "scheduledAt": "2026-09-07T10:00:00Z",
+  "timestamp": "2026-09-05T14:00:00Z"
+}
+```
 
 ## API pública
 
-No se expondrán inicialmente endpoints públicos de negocio.
-
-Endpoints técnicos futuros:
-
-```http
-GET /actuator/health
-GET /actuator/metrics
+```text
+No posee endpoints REST de negocio.
 ```
 
 ## Observabilidad
 
-Métricas relevantes:
-
-- mensajes consumidos;
-- mensajes exitosos;
-- mensajes fallidos;
-- reintentos;
-- tasa de DLQ;
-- tiempo de procesamiento.
-
-Herramientas:
-
 - Spring Boot Actuator.
+- Logs.
+- Métricas.
 - Amazon CloudWatch.
-
-## Variables de entorno
-
-```env
-SERVER_PORT=8084
-
-RABBITMQ_HOST=
-RABBITMQ_PORT=5672
-RABBITMQ_USER=
-RABBITMQ_PASSWORD=
-
-MAIL_HOST=
-MAIL_PORT=
-MAIL_USERNAME=
-MAIL_PASSWORD=
-
-EUREKA_SERVER_URL=
-```
-
-## Contratos
-
-Los mensajes RabbitMQ serán documentados mediante AsyncAPI en:
-
-```text
-barriodigital-contracts
-```
 
 ## Estructura esperada
 
@@ -174,12 +109,23 @@ src/
 │   │       ├── config/
 │   │       ├── consumer/
 │   │       ├── dto/
-│   │       ├── exception/
 │   │       ├── service/
-│   │       └── util/
+│   │       └── exception/
 │   └── resources/
 │       └── application.yml
 └── test/
+```
+
+## Contrato
+
+```text
+barriodigital-contracts/asyncapi/rabbitmq.asyncapi.yaml
+```
+
+## Ejecución
+
+```bash
+./mvnw spring-boot:run
 ```
 
 ## Docker
@@ -187,10 +133,6 @@ src/
 ```bash
 docker build -t barriodigital/notify:1.0.0 .
 ```
-
-## CI/CD
-
-GitHub Actions será utilizado para build, testing, análisis y generación de imagen Docker.
 
 ## Estrategia Git
 
@@ -203,4 +145,4 @@ fix/*
 
 ## Estado
 
-🚧 Proyecto en etapa inicial de diseño y construcción.
+🚧 Proyecto en etapa inicial de diseño e implementación.
